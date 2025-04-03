@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Globe</title>
+    <!-- Use specific compatible versions of each library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/1.6.19/topojson.min.js"></script>
+    
+    <!-- Direct link to PlanetaryJS from unpkg -->
+    <script src="https://unpkg.com/planetary.js@1.1.2/dist/planetaryjs.min.js"></script>
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #rotatingGlobe {
+            width: 600px;
+            height: 600px;
+            cursor: move;
+            display: block;
+        }
+        /* Add tooltip styles */
+        #tooltip {
+            position: absolute;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 1000;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id='rotatingGlobe' width='600' height='600'></canvas>
+    <!-- Add tooltip div -->
+    <div id="tooltip"></div>
+
+    <script>
+    // Check if libraries are loaded by logging them
+    console.log("D3 Version:", d3.version);
+    console.log("PlanetaryJS available:", typeof planetaryjs !== 'undefined');
+    
+    window.onload = function() {
+        try {
+            // Create the globe
+            var globe = planetaryjs.planet();
+            
+            // Load our custom `autorotate` plugin
+            globe.loadPlugin(autorotate(5));
+
+            // The `earth` plugin draws the oceans and the land
+            globe.loadPlugin(planetaryjs.plugins.earth({
+                topojson: { file: 'https://raw.githubusercontent.com/MadeByDroids/madebydroids.github.io/master/world-110m-withlakes%20(1).json' },
+                oceans:   { fill:   '#fecb00' },
+                land:     { fill:   '#222221' },
+                borders:  { stroke: '#333333' }
+            }));
+
+            // Load our custom `lakes` plugin to draw lakes
+            globe.loadPlugin(lakes({
+                fill: '#fecb00'
+            }));
+
+            // The `pings` plugin draws animated pings on the globe
+            globe.loadPlugin(planetaryjs.plugins.pings());
+
+            // The `zoom` and `drag` plugins enable manipulating the globe with the mouse
+            globe.loadPlugin(planetaryjs.plugins.zoom({
+                scaleExtent: [170, 300]
+            }));
+            
+            globe.loadPlugin(planetaryjs.plugins.drag({
+                // Dragging the globe should pause the automatic rotation until we release the mouse
+                onDragStart: function() {
+                    this.plugins.autorotate.pause();
+                },
+                onDragEnd: function() {
+                    this.plugins.autorotate.resume();
+                }
+            }));
+
+            // Set up the globe's initial scale, offset, and rotation
+            // Center the globe by setting appropriate translation values
+            // The translation coordinates should be half the canvas dimensions
+            var canvas = document.getElementById('rotatingGlobe');
+            var canvasWidth = canvas.width;
+            var canvasHeight = canvas.height;
+            
+            globe.projection.scale(275).translate([canvasWidth/2, canvasHeight/2]).rotate([0, -10, 0]);
+
+            // Define multiple locations to ping with names
+            var locations = [
+  { name: "Montgomery, Alabama", lat: 32.3792, lng: -86.3077 },
+  { name: "Alcobendas, Madrid", lat: 40.5372, lng: -3.6365 },
+  { name: "Amsterdam", lat: 52.3125, lng: 4.9455 },
+  { name: "Phoenix, Arizona", lat: 33.4508, lng: -112.0708 },
+  { name: "Little Rock, Arkansas", lat: 34.7465, lng: -92.2896 },
+  { name: "Auckland", lat: -41.2865, lng: 174.7762 },
+  { name: "Barcelona", lat: 41.3833, lng: 2.1833 },
+  { name: "Beijing", lat: 39.9042, lng: 116.4074 },
+  { name: "San Jose, California", lat: 37.3382, lng: -121.895 },
+  { name: "Englewood, Colorado", lat: 39.5812, lng: -104.8705 },
+  { name: "Hartford, Connecticut", lat: 41.7658, lng: -72.6734 },
+  { name: "Dover, Delaware", lat: 39.1582, lng: -75.5244 },
+  { name: "Ashburn, District of Columbia", lat: 39.0437, lng: -77.4875 },
+  { name: "Dubai", lat: 25.2048, lng: 55.397 },
+  { name: "Dublin", lat: 53.3498, lng: -6.2603 },
+  { name: "Miami, Florida", lat: 25.7617, lng: -80.1918 },
+  { name: "Fortaleza", lat: -3.7172, lng: -38.5239 },
+  { name: "Frankfurt", lat: 50.1109, lng: 8.6821 },
+  { name: "Atlanta, Georgia", lat: 33.749, lng: -84.388 },
+  { name: "Halifax, NS", lat: 44.6488, lng: -63.5752 },
+  { name: "Hamilton, Ontario", lat: 43.2557, lng: -79.8711 },
+  { name: "Honolulu, Hawaii", lat: 21.3069, lng: -157.8583 }, //corrected
+  { name: "Boise, Idaho", lat: 43.615, lng: -116.2023 },
+  { name: "Chicago, Illinois", lat: 41.8781, lng: -87.6298 },
+  { name: "Indianapolis, Indiana", lat: 39.7684, lng: -86.1581 },
+  { name: "Des Moines, Iowa", lat: 41.5868, lng: -93.625 },
+  { name: "Istanbul", lat: 41.00824, lng: 28.978359 },
+  { name: "Jakarta", lat: -6.2088, lng: 106.8456 },
+  { name: "Johannesburg", lat: -26.2041, lng: 28.0473 },
+  { name: "Topeka, Kansas", lat: 39.0489, lng: -95.677 },
+  { name: "Frankfort, Kentucky", lat: 38.2009, lng: -84.8733 },
+  { name: "Kiev", lat: 50.4501, lng: 30.5234 },
+  { name: "Kuala Lumpur", lat: 2.927, lng: 101.66 },
+  { name: "Leeds", lat: 53.8008, lng: -1.5491 },
+  { name: "Lethbridge", lat: 49.6935, lng: -112.8418 },
+  { name: "Limassol", lat: 34.7071, lng: 33.0226 },
+  { name: "London", lat: 51.5074, lng: -0.1276 },
+  { name: "Baton Rouge, Louisiana", lat: 30.4515, lng: -91.1871 },
+  { name: "Augusta, Maine", lat: 44.3106, lng: -69.7795 },
+  { name: "Marseille", lat: 43.2965, lng: -5.3698 },
+  { name: "Annapolis, Maryland", lat: 38.9784, lng: -76.4922 },
+  { name: "Boston, Massachusetts", lat: 42.3601, lng: -71.0589 },
+  { name: "Melbourne, Victoria", lat: -37.8172, lng: 144.9563 },
+  { name: "Mexico", lat: 20.5888, lng: -100.3899 },
+  { name: "Mexico City", lat: 19.4326, lng: -99.1332 },
+  { name: "Lansing, Michigan", lat: 42.7325, lng: -84.5555 },
+  { name: "Milan", lat: 45.4642, lng: 9.19 },
+  { name: "Milano", lat: 45.4642, lng: 9.19 },
+  { name: "St. Paul, Minnesota", lat: 46.729553, lng: -94.685899 },
+  { name: "Jackson, Mississippi", lat: 32.354668, lng: -89.398528 },
+  { name: "Jefferson City, Missouri", lat: 37.964253, lng: -91.831833 },
+  { name: "Helena, Montana", lat: 46.879682, lng: -110.362566 },
+  { name: "Moscow", lat: 55.7558, lng: 37.6173 },
+  { name: "Mumbai,India", lat: 19.07609, lng: 72.877426 },
+  { name: "Lincoln, Nebraska", lat: 41.492537, lng: -99.901813 },
+  { name: "Carson City, Nevada", lat: 38.80261, lng: -116.419389 },
+  { name: "Concord, New Hampshire", lat: 43.193852, lng: -71.572395 },
+  { name: "Secaucus, New Jersey", lat: 40.7895, lng: -74.0672 },
+  { name: "Santa Fe, New Mexico", lat: 34.97273, lng: -105.032363 },
+  { name: "New York", lat: 40.7128, lng: -74.006 },
+  { name: "Raleigh, North Carolina", lat: 35.759573, lng: -79.0193 },
+  { name: "Bismarck, North Dakota", lat: 47.551493, lng: -101.002012 },
+  { name: "Columbus, Ohio", lat: 40.417287, lng: -82.907123 },
+  { name: "Oklahoma City, Oklahoma", lat: 35.007752, lng: -97.092877 },
+  { name: "Hillsboro, Oregon", lat: 45.5229, lng: -122.9898 },
+  { name: "Ottawa", lat: 45.42153, lng: -75.697193 },
+  { name: "Philadelphia, Pennsylvania", lat: 39.9526, lng: -75.1638 },
+  { name: "Providence, Rhode Island", lat: 41.580095, lng: -71.477429 },
+  { name: "Rome", lat: 41.9028, lng: 12.4964 },
+  { name: "Santana de Parnaiba", lat: -23.42, lng: -46.9186 },
+  { name: "Santiago de Surco, Lima", lat: -12.1179, lng: -76.9665 },
+  { name: "Seoul", lat: 37.5665, lng: 126.9779 },
+  { name: "Shanghai", lat: 31.2304, lng: 121.4737 },
+  { name: "Shenzen", lat: 22.5431, lng: 114.0579 },
+  { name: "Singapore", lat: 1.3521, lng: 103.8198 },
+  { name: "Slough", lat: 51.5095, lng: -0.5954 },
+  { name: "Sofia", lat: 42.6977, lng: 23.3219 },
+  { name: "Columbia, South Carolina", lat: 34.000343, lng: -81.033211 },
+  { name: "Pierre, South Dakota", lat: 44.367031, lng: -100.346405 },
+  { name: "Stockholm", lat: 59.3293, lng: 18.0686 },
+  { name: "Sydney", lat: -33.8688, lng: 151.2093 },
+  { name: "Taipei", lat: 25.033, lng: 121.5654 }, //corrected coordinate
+  { name: "Nashville, Tennessee", lat: 36.16581, lng: -86.784241 },
+  { name: "Dallas, Texas", lat: 32.7767, lng: -96.797 },
+  { name: "Tokyo", lat: 35.6895, lng: 139.6917 },
+  { name: "Toronto", lat: 43.6511, lng: -79.361 },
+  { name: "Tsuen Wan, Hong Kong", lat: 22.267, lng: 114.2395 },
+  { name: "Salt Lake City, Utah", lat: 40.76083, lng: -111.89111 },
+  { name: "Vancouver", lat: 49.2827, lng: -123.1156 },
+  { name: "Montpelier, Vermont", lat: 44.2601, lng: -72.5754 },
+  { name: "Culpeper, Virginia", lat: 38.4729, lng: -77.9952 },
+  { name: "Seattle, Washington", lat: 47.6062, lng: -122.3345 },
+  { name: "Charleston, West Virginia", lat: 38.3498, lng: -81.6326 },
+  { name: "Madison, Wisconsin", lat: 43.0731, lng: -89.4012 },
+  { name: "Cheyenne, Wyoming", lat: 41.14, lng: -104.8202 },
+  { name: "Zurich", lat: 47.4323, lng: 8.563 },
+  { name: "Silicon Valley 9", lat: 37.3861, lng: -121.969 },
+  { name: "Silicon Valley 1", lat: 37.3688, lng: -122.0227 },
+  { name: "New York City 1", lat: 40.741, lng: -74.002 },
+  { name: "Sydney 1", lat: -33.8668, lng: 151.2093 },
+  { name: "Dallas 1", lat: 32.9866, lng: -96.7342 },
+  { name: "Denver 1", lat: 39.7392, lng: -104.9903 },
+  { name: "Atlanta 1", lat: 33.749, lng: -84.388 },
+  { name: "Sydney 1", lat: -33.8668, lng: 151.2093 },
+  { name: "Los Angeles 5", lat: 34.0505, lng: -118.2551 },
+  { name: "London Heathrow 1", lat: 51.5064, lng: -0.4452 },
+  { name: "Melbourne 1", lat: -37.8349, lng: 144.9633 },
+  { name: "Singapore 1", lat: 1.3392, lng: 103.8914 },
+  { name: "Amsterdam 1", lat: 52.3094, lng: 4.9357 },
+  { name: "Frankfurt 1", lat: 50.1109, lng: 8.6821 },
+  { name: "Amsterdam 2", lat: 52.3094, lng: 4.9357 },
+  { name: "Frankfurt 2", lat: 50.1109, lng: 8.6821 },
+  { name: "Frankfurt 8", lat: 50.1109, lng: 8.6821 },
+  { name: "Albertstraße", lat: 51.2254018, lng: 6.772298813 },
+  { name: "Vierenkamp", lat: 53.6435237, lng: 9.9751724 },
+  { name: "Kruppstrasse", lat: 50.1379284, lng: 8.7444682 },
+  { name: "Kleyerstrasse", lat: 50.0956373, lng: 8.6197249 },
+  { name: "Gutleutstrasse", lat: 50.096586, lng: 8.6439349 },
+  { name: "Friesstrasse", lat: 50.1390902, lng: 8.7396314 },
+  { name: "Laerchenstrasse", lat: 50.0964546, lng: 8.590393066 },
+  { name: "Seidlstrasse", lat: 48.146291, lng: 11.6826828 },
+  { name: "Dywidagstrasse", lat: 48.146286, lng: 11.68268585 },
+  { name: "Rue de Strasbourg", lat: 44.896167, lng: -0.6118676 },
+  { name: "Courbevoie", lat: 48.904141, lng: 2.25731 },
+  { name: "Saint-Denis", lat: 48.9333, lng: 2.3667 },
+  { name: "Aubervilliers", lat: 48.910158, lng: 2.368229 },
+  { name: "Meudon", lat: 48.7884838, lng: 2.2153075 },
+  { name: "Roissy-en-France", lat: 48.984885, lng: 2.509284 },
+  { name: "Ozoir-la-Ferrière", lat: 48.910158, lng: 2.368229 },
+  { name: "Pantin", lat: 48.9008387, lng: 2.4211394 },
+  { name: "Centro", lat: -22.9547443, lng: -43.1945896 },
+  { name: "Barueri", lat: -23.5026432, lng: -46.8271027 },
+  { name: "Santana de Parnaíba", lat: -23.4663152, lng: -46.8632783 },
+  { name: "Botafogo", lat: -22.9547443, lng: -43.1945896 },
+  { name: "Del Castilho", lat: -22.8729289, lng: -43.2679085 }
+]
+            
+            // Store active pings for hover detection
+            var activePings = [];
+            var tooltip = document.getElementById('tooltip');
+            
+            // Set color for the pings
+            var pingColor = 'white';
+            
+            // Create pings at all specified locations every few hundred milliseconds
+            setInterval(function() {
+                // Clear previous active pings
+                activePings = [];
+                
+                // Ping all locations in the array
+                locations.forEach(function(location) {
+                    var ping = globe.plugins.pings.add(location.lng, location.lat, { 
+                        color: pingColor,
+                        ttl: 1000,
+                        angle: Math.random() * 2
+                    });
+                    
+                    // Store the ping with its location for hover detection
+                    activePings.push({
+                        ping: ping,
+                        location: location
+                    });
+                });
+            }, 150);
+
+            // Add mousemove event listener to show tooltip on hover
+            canvas.addEventListener('mousemove', function(e) {
+                var rect = canvas.getBoundingClientRect();
+                var x = e.clientX - rect.left;
+                var y = e.clientY - rect.top;
+                
+                // Project the hover position to globe coordinates
+                var pos = globe.projection.invert([x, y]);
+                if (!pos) return;
+                
+                // Check if the hover is near any ping
+                var found = false;
+                var pingRadius = 7;  // Detection radius
+                
+                activePings.forEach(function(activePing) {
+                    var loc = activePing.location;
+                    
+                    // Calculate pixel distance
+                    var locPos = globe.projection([loc.lng, loc.lat]);
+                    if (!locPos) return;
+                    
+                    var dx = x - locPos[0];
+                    var dy = y - locPos[1];
+                    var distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    // If mouse is close to a ping
+                    if (distance < pingRadius * 2) {
+                        // Show only the location name
+                        tooltip.innerHTML = loc.name;
+                        tooltip.style.left = (e.clientX + 10) + 'px';
+                        tooltip.style.top = (e.clientY + 10) + 'px';
+                        tooltip.style.opacity = 1;
+                        found = true;
+                    }
+                });
+                
+                if (!found) {
+                    tooltip.style.opacity = 0;
+                }
+            });
+            
+            // Hide tooltip when mouse leaves canvas
+            canvas.addEventListener('mouseleave', function() {
+                tooltip.style.opacity = 0;
+            });
+
+            // Special code to handle high-density displays (e.g. retina, some phones)
+            if (window.devicePixelRatio == 2) {
+                canvas.width = canvas.width * 2;
+                canvas.height = canvas.height * 2;
+                context = canvas.getContext('2d');
+                context.scale(2, 2);
+            }
+            
+            // Draw that globe!
+            globe.draw(canvas);
+
+            console.log("Globe initialized successfully");
+            
+        } catch(e) {
+            console.error("Error initializing globe:", e);
+        }
+        
+        // This plugin will automatically rotate the globe around its vertical
+        // axis a configured number of degrees every second
+        function autorotate(degPerSec) {
+            return function(planet) {
+                var lastTick = null;
+                var paused = false;
+                planet.plugins.autorotate = {
+                    pause:  function() { paused = true;  },
+                    resume: function() { paused = false; }
+                };
+                
+                planet.onDraw(function() {
+                    if (paused || !lastTick) {
+                        lastTick = new Date();
+                    } else {
+                        var now = new Date();
+                        var delta = now - lastTick;
+                        var rotation = planet.projection.rotate();
+                        rotation[0] += degPerSec * delta / 1000;
+                        if (rotation[0] >= 180) rotation[0] -= 360;
+                        planet.projection.rotate(rotation);
+                        lastTick = now;
+                    }
+                });
+            };
+        }
+
+        // This plugin takes lake data from the special TopoJSON we're loading and draws them on the map
+        function lakes(options) {
+            options = options || {};
+            var lakes = null;
+
+            return function(planet) {
+                planet.onInit(function() {
+                    // We can access the data loaded from the TopoJSON plugin
+                    var world = planet.plugins.topojson.world;
+                    lakes = topojson.feature(world, world.objects.ne_110m_lakes);
+                });
+
+                planet.onDraw(function() {
+                    planet.withSavedContext(function(context) {
+                        context.beginPath();
+                        planet.path.context(context)(lakes);
+                        context.fillStyle = options.fill || 'black';
+                        context.fill();
+                    });
+                });
+            };
+        }
+    };
+    </script>
+</body>
+</html>
